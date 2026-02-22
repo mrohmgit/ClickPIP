@@ -213,11 +213,11 @@ export default function PIPDetailPage({ params }: { params: Promise<{ id: string
 
   const daysLeft = getDaysRemaining(pip.endDate);
   const timeProgress = getTimeProgress(pip.startDate, pip.endDate);
-  const totalGoals = pip.goals.length;
+  const totalGoals = (pip.goals || []).length;
   const avgProgress =
     totalGoals > 0
       ? Math.round(
-          pip.goals.reduce(
+          (pip.goals || []).reduce(
             (sum, g) => sum + Math.min((g.currentValue / g.targetValue) * 100, 100),
             0
           ) / totalGoals
@@ -399,16 +399,16 @@ export default function PIPDetailPage({ params }: { params: Promise<{ id: string
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-base font-title">
                     <Target className="h-4 w-4 text-brand-dark" />
-                    เป้าหมาย / KPI ({pip.goals.length} เป้าหมาย)
+                    เป้าหมาย / KPI ({(pip.goals || []).length} เป้าหมาย)
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {pip.goals.length === 0 ? (
+                  {(pip.goals || []).length === 0 ? (
                     <p className="py-8 text-center text-sm text-muted-foreground">
                       ยังไม่ได้กำหนดเป้าหมาย
                     </p>
                   ) : (
-                    pip.goals.map((goal) => <GoalProgressCard key={goal.id} goal={goal} />)
+                    (pip.goals || []).map((goal) => <GoalProgressCard key={goal.id} goal={goal} />)
                   )}
                 </CardContent>
               </Card>
@@ -491,7 +491,7 @@ export default function PIPDetailPage({ params }: { params: Promise<{ id: string
                 <CardContent>
                   <div className="space-y-2">
                     {Object.entries(goalStatusConfig).map(([key, config]) => {
-                      const count = pip.goals.filter((g) => g.status === key).length;
+                      const count = (pip.goals || []).filter((g) => g.status === key).length;
                       if (count === 0) return null;
                       const StatusIcon = config.icon;
                       return (
@@ -565,7 +565,7 @@ export default function PIPDetailPage({ params }: { params: Promise<{ id: string
                             </TableHeader>
                             <TableBody>
                               {ci.goalUpdates.map((gu) => {
-                                const goal = pip.goals.find((g) => g.id === gu.goalId);
+                                const goal = (pip.goals || []).find((g) => g.id === gu.goalId);
                                 const change = gu.currentValue - gu.previousValue;
                                 return (
                                   <TableRow key={gu.goalId}>

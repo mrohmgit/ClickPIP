@@ -113,7 +113,7 @@ function computeAnalytics(pipData: PIPRecord[], deptData: Department[], userData
 
   // Avg goals per PIP
   const avgGoals = total > 0
-    ? (pipData.reduce((sum, p) => sum + p.goals.length, 0) / total).toFixed(1)
+    ? (pipData.reduce((sum, p) => sum + (p.goals || []).length, 0) / total).toFixed(1)
     : "0";
 
   return {

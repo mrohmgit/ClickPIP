@@ -291,10 +291,10 @@ export default function SettingsPage() {
                     <Separator />
                     <div>
                       <p className="mb-2 text-xs font-medium text-muted-foreground">
-                        เป้าหมาย ({template.goals.length})
+                        เป้าหมาย ({(template.goals || []).length})
                       </p>
                       <div className="space-y-1.5">
-                        {template.goals.map((goal, i) => (
+                        {(template.goals || []).map((goal, i) => (
                           <div
                             key={i}
                             className="flex items-center gap-2 rounded bg-muted/50 px-2 py-1.5"

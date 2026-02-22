@@ -96,7 +96,7 @@ export default function EvaluatePIPPage({
     Record<string, { rating: GoalRating | null; note: string }>
   >(() => {
     const initial: Record<string, { rating: GoalRating | null; note: string }> = {};
-    (pip || mockPIP)?.goals.forEach((g) => {
+    ((pip || mockPIP)?.goals || []).forEach((g) => {
       initial[g.id] = { rating: null, note: "" };
     });
     return initial;
@@ -139,12 +139,12 @@ export default function EvaluatePIPPage({
     );
   }
 
-  const allGoalsRated = pip.goals.every((g) => goalRatings[g.id]?.rating);
+  const allGoalsRated = (pip.goals || []).every((g) => goalRatings[g.id]?.rating);
   const isValid = allGoalsRated && overallRating && result && summary.trim();
 
   const handleSubmit = async () => {
     const body = {
-      goalRatings: pip.goals.map((g) => ({
+      goalRatings: (pip.goals || []).map((g) => ({
         goalId: g.id,
         rating: goalRatings[g.id]?.rating,
         note: goalRatings[g.id]?.note || "",
@@ -238,7 +238,7 @@ export default function EvaluatePIPPage({
                 {pip.startDate} — {pip.endDate}
               </span>
               <Badge className="bg-brand-dark text-white hover:bg-brand-dark">
-                {pip.goals.length} เป้าหมาย
+                {(pip.goals || []).length} เป้าหมาย
               </Badge>
             </CardContent>
           </Card>
@@ -252,7 +252,7 @@ export default function EvaluatePIPPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {pip.goals.map((goal, index) => {
+              {(pip.goals || []).map((goal, index) => {
                 const percent = Math.min(
                   Math.round((goal.currentValue / goal.targetValue) * 100),
                   100
@@ -425,7 +425,7 @@ export default function EvaluatePIPPage({
             <CardContent className="space-y-4">
               {/* Goal Ratings Summary */}
               <div className="space-y-2">
-                {pip.goals.map((goal, index) => {
+                {(pip.goals || []).map((goal, index) => {
                   const rating = goalRatings[goal.id]?.rating;
                   return (
                     <div

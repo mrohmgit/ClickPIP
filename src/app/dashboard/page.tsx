@@ -231,14 +231,15 @@ export default function DashboardPage() {
               <TableBody>
                 {activePIPs.map((pip) => {
                   const daysLeft = getDaysRemaining(pip.endDate);
-                  const totalGoals = pip.goals.length;
-                  const achievedGoals = pip.goals.filter(
+                  const goals = pip.goals || [];
+                  const totalGoals = goals.length;
+                  const achievedGoals = goals.filter(
                     (g) => g.status === "achieved"
                   ).length;
                   const avgProgress =
                     totalGoals > 0
                       ? Math.round(
-                          pip.goals.reduce(
+                          goals.reduce(
                             (sum, g) =>
                               sum +
                               Math.min((g.currentValue / g.targetValue) * 100, 100),

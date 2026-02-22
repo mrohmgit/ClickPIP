@@ -135,11 +135,11 @@ export default function MyPIPPage() {
   const checkIns: CheckIn[] = mockCheckIns.filter((ci) => ci.pipId === currentPIP.id);
   const daysLeft = getDaysRemaining(currentPIP.endDate);
   const timeProgress = getTimeProgress(currentPIP.startDate, currentPIP.endDate);
-  const totalGoals = currentPIP.goals.length;
+  const totalGoals = (currentPIP.goals || []).length;
   const avgProgress =
     totalGoals > 0
       ? Math.round(
-          currentPIP.goals.reduce(
+          (currentPIP.goals || []).reduce(
             (sum, g) => sum + Math.min((g.currentValue / g.targetValue) * 100, 100),
             0
           ) / totalGoals
@@ -356,7 +356,7 @@ export default function MyPIPPage() {
             </Card>
 
             {/* Goals */}
-            {currentPIP.goals.map((goal, index) => {
+            {(currentPIP.goals || []).map((goal, index) => {
               const percent = Math.min(
                 Math.round((goal.currentValue / goal.targetValue) * 100),
                 100
@@ -419,7 +419,7 @@ export default function MyPIPPage() {
               );
             })}
 
-            {currentPIP.goals.length === 0 && (
+            {(currentPIP.goals || []).length === 0 && (
               <Card className="border-none shadow-sm">
                 <CardContent className="flex flex-col items-center py-12">
                   <FileText className="h-10 w-10 text-muted-foreground" />
@@ -486,7 +486,7 @@ export default function MyPIPPage() {
                             </TableHeader>
                             <TableBody>
                               {ci.goalUpdates.map((gu) => {
-                                const goal = currentPIP.goals.find(
+                                const goal = (currentPIP.goals || []).find(
                                   (g) => g.id === gu.goalId
                                 );
                                 const change = gu.currentValue - gu.previousValue;

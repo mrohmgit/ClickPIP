@@ -273,11 +273,11 @@ export default function PIPListPage() {
               ) : (
                 filteredPIPs.map((pip, index) => {
                   const daysLeft = getDaysRemaining(pip.endDate);
-                  const totalGoals = pip.goals.length;
+                  const totalGoals = (pip.goals || []).length;
                   const avgProgress =
                     totalGoals > 0
                       ? Math.round(
-                          pip.goals.reduce(
+                          (pip.goals || []).reduce(
                             (sum, g) =>
                               sum +
                               Math.min(
