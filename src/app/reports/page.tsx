@@ -35,89 +35,91 @@ import {
   FileText,
   PieChart,
 } from "lucide-react";
+import { useApi } from "@/lib/hooks";
+import { LoadingSkeleton } from "@/components/ui/loading";
+import { ErrorState } from "@/components/ui/error-state";
 import { mockPIPs, mockDepartments, mockUsers } from "@/lib/mockup-data";
+import type { PIPRecord, Department, User } from "@/lib/types";
 
-// Compute analytics from mockup data
-function useAnalytics() {
-  return useMemo(() => {
-    const total = mockPIPs.length;
-    const active = mockPIPs.filter((p) => p.status === "active").length;
-    const completed = mockPIPs.filter((p) => p.status === "completed").length;
-    const failed = mockPIPs.filter((p) => p.status === "failed").length;
-    const pending = mockPIPs.filter((p) => p.status === "pending").length;
-    const passRate = completed + failed > 0 ? Math.round((completed / (completed + failed)) * 100) : 0;
+// Compute analytics from PIP data
+function computeAnalytics(pipData: PIPRecord[], deptData: Department[], userData: User[]) {
+  const total = pipData.length;
+  const active = pipData.filter((p) => p.status === "active").length;
+  const completed = pipData.filter((p) => p.status === "completed").length;
+  const failed = pipData.filter((p) => p.status === "failed").length;
+  const pending = pipData.filter((p) => p.status === "pending").length;
+  const passRate = completed + failed > 0 ? Math.round((completed / (completed + failed)) * 100) : 0;
 
-    // By department
-    const byDepartment = mockDepartments.map((dept) => {
-      const deptPIPs = mockPIPs.filter((p) => p.employeeDepartment === dept.name);
-      const deptCompleted = deptPIPs.filter((p) => p.status === "completed").length;
-      const deptFailed = deptPIPs.filter((p) => p.status === "failed").length;
-      const deptActive = deptPIPs.filter((p) => p.status === "active").length;
-      const deptRate = deptCompleted + deptFailed > 0
-        ? Math.round((deptCompleted / (deptCompleted + deptFailed)) * 100)
-        : 0;
-      return {
-        ...dept,
-        total: deptPIPs.length,
-        active: deptActive,
-        completed: deptCompleted,
-        failed: deptFailed,
-        passRate: deptRate,
-      };
-    }).filter((d) => d.total > 0);
-
-    // By duration
-    const byDuration = [30, 60, 90].map((dur) => {
-      const durPIPs = mockPIPs.filter((p) => p.duration === dur);
-      const durCompleted = durPIPs.filter((p) => p.status === "completed").length;
-      const durFailed = durPIPs.filter((p) => p.status === "failed").length;
-      return {
-        duration: dur,
-        total: durPIPs.length,
-        completed: durCompleted,
-        failed: durFailed,
-        passRate: durCompleted + durFailed > 0
-          ? Math.round((durCompleted / (durCompleted + durFailed)) * 100)
-          : 0,
-      };
-    }).filter((d) => d.total > 0);
-
-    // By manager
-    const managerIds = [...new Set(mockPIPs.map((p) => p.managerId))];
-    const byManager = managerIds.map((mgrId) => {
-      const mgr = mockUsers.find((u) => u.id === mgrId);
-      const mgrPIPs = mockPIPs.filter((p) => p.managerId === mgrId);
-      const mgrCompleted = mgrPIPs.filter((p) => p.status === "completed").length;
-      const mgrFailed = mgrPIPs.filter((p) => p.status === "failed").length;
-      return {
-        id: mgrId,
-        name: mgr?.name || "ไม่ทราบ",
-        department: mgr?.department || "",
-        total: mgrPIPs.length,
-        active: mgrPIPs.filter((p) => p.status === "active").length,
-        completed: mgrCompleted,
-        failed: mgrFailed,
-        passRate: mgrCompleted + mgrFailed > 0
-          ? Math.round((mgrCompleted / (mgrCompleted + mgrFailed)) * 100)
-          : 0,
-      };
-    });
-
-    // Recent PIPs
-    const recentPIPs = [...mockPIPs]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 5);
-
-    // Avg goals per PIP
-    const avgGoals = total > 0
-      ? (mockPIPs.reduce((sum, p) => sum + p.goals.length, 0) / total).toFixed(1)
-      : "0";
-
+  // By department
+  const byDepartment = deptData.map((dept) => {
+    const deptPIPs = pipData.filter((p) => p.employeeDepartment === dept.name);
+    const deptCompleted = deptPIPs.filter((p) => p.status === "completed").length;
+    const deptFailed = deptPIPs.filter((p) => p.status === "failed").length;
+    const deptActive = deptPIPs.filter((p) => p.status === "active").length;
+    const deptRate = deptCompleted + deptFailed > 0
+      ? Math.round((deptCompleted / (deptCompleted + deptFailed)) * 100)
+      : 0;
     return {
-      total, active, completed, failed, pending, passRate,
-      byDepartment, byDuration, byManager, recentPIPs, avgGoals,
+      ...dept,
+      total: deptPIPs.length,
+      active: deptActive,
+      completed: deptCompleted,
+      failed: deptFailed,
+      passRate: deptRate,
     };
-  }, []);
+  }).filter((d) => d.total > 0);
+
+  // By duration
+  const byDuration = [30, 60, 90].map((dur) => {
+    const durPIPs = pipData.filter((p) => p.duration === dur);
+    const durCompleted = durPIPs.filter((p) => p.status === "completed").length;
+    const durFailed = durPIPs.filter((p) => p.status === "failed").length;
+    return {
+      duration: dur,
+      total: durPIPs.length,
+      completed: durCompleted,
+      failed: durFailed,
+      passRate: durCompleted + durFailed > 0
+        ? Math.round((durCompleted / (durCompleted + durFailed)) * 100)
+        : 0,
+    };
+  }).filter((d) => d.total > 0);
+
+  // By manager
+  const managerIds = [...new Set(pipData.map((p) => p.managerId))];
+  const byManager = managerIds.map((mgrId) => {
+    const mgr = userData.find((u) => u.id === mgrId);
+    const mgrPIPs = pipData.filter((p) => p.managerId === mgrId);
+    const mgrCompleted = mgrPIPs.filter((p) => p.status === "completed").length;
+    const mgrFailed = mgrPIPs.filter((p) => p.status === "failed").length;
+    return {
+      id: mgrId,
+      name: mgr?.name || "ไม่ทราบ",
+      department: mgr?.department || "",
+      total: mgrPIPs.length,
+      active: mgrPIPs.filter((p) => p.status === "active").length,
+      completed: mgrCompleted,
+      failed: mgrFailed,
+      passRate: mgrCompleted + mgrFailed > 0
+        ? Math.round((mgrCompleted / (mgrCompleted + mgrFailed)) * 100)
+        : 0,
+    };
+  });
+
+  // Recent PIPs
+  const recentPIPs = [...pipData]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
+
+  // Avg goals per PIP
+  const avgGoals = total > 0
+    ? (pipData.reduce((sum, p) => sum + p.goals.length, 0) / total).toFixed(1)
+    : "0";
+
+  return {
+    total, active, completed, failed, pending, passRate,
+    byDepartment, byDuration, byManager, recentPIPs, avgGoals,
+  };
 }
 
 function BarVisual({ value, max, color }: { value: number; max: number; color: string }) {
@@ -186,7 +188,34 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 };
 
 export default function ReportsPage() {
-  const analytics = useAnalytics();
+  // Fetch all PIPs from API for report computation
+  const { data: apiPIPs, loading, error, refetch } = useApi<PIPRecord[]>("/api/pip");
+
+  // Fallback to mockup data
+  const pips = apiPIPs && apiPIPs.length > 0 ? apiPIPs : mockPIPs;
+  const departments = mockDepartments;
+  const users = mockUsers;
+
+  const analytics = useMemo(
+    () => computeAnalytics(pips, departments, users),
+    [pips, departments, users]
+  );
+
+  if (loading) {
+    return (
+      <AppShell title="รายงาน" subtitle="สรุปภาพรวมแผนพัฒนาประสิทธิภาพ (PIP)">
+        <LoadingSkeleton rows={4} />
+      </AppShell>
+    );
+  }
+
+  if (error && mockPIPs.length === 0) {
+    return (
+      <AppShell title="รายงาน" subtitle="สรุปภาพรวมแผนพัฒนาประสิทธิภาพ (PIP)">
+        <ErrorState message={error} onRetry={refetch} />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title="รายงาน" subtitle="สรุปภาพรวมแผนพัฒนาประสิทธิภาพ (PIP)">
@@ -212,7 +241,7 @@ export default function ReportsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">ทุกแผนก</SelectItem>
-              {mockDepartments.map((d) => (
+              {departments.map((d) => (
                 <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>

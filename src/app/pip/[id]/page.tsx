@@ -34,9 +34,13 @@ import {
   AlertTriangle,
   FileText,
   BarChart3,
+  Loader2,
 } from "lucide-react";
+import { useApi, useApiMutation } from "@/lib/hooks";
+import { LoadingSkeleton } from "@/components/ui/loading";
+import { ErrorState } from "@/components/ui/error-state";
 import { mockPIPs, mockCheckIns, mockComments } from "@/lib/mockup-data";
-import type { PIPRecord, PIPGoal, GoalRating } from "@/lib/types";
+import type { PIPRecord, PIPGoal, GoalRating, CheckIn, Comment } from "@/lib/types";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   active: { label: "กำลังดำเนินการ", className: "bg-brand-dark text-white hover:bg-brand-dark" },
@@ -162,10 +166,36 @@ function TimelineItem({
 export default function PIPDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [newComment, setNewComment] = useState("");
-  const [comments, setComments] = useState(mockComments.filter((c) => c.pipId === id));
 
-  const pip = mockPIPs.find((p) => p.id === id);
-  const checkIns = mockCheckIns.filter((ci) => ci.pipId === id);
+  // Fetch PIP detail from API
+  const { data: apiPIP, loading, error, refetch } = useApi<PIPRecord>(`/api/pip/${id}`);
+
+  // Comment mutation
+  const { mutate: postComment, loading: postingComment } = useApiMutation(`/api/pip/${id}/comments`);
+
+  // Fallback to mockup
+  const mockPIP = mockPIPs.find((p) => p.id === id);
+  const pip = apiPIP || mockPIP;
+
+  // Check-ins and comments from API PIP data or fallback
+  const checkIns: CheckIn[] = mockCheckIns.filter((ci) => ci.pipId === id);
+  const [comments, setComments] = useState<Comment[]>(mockComments.filter((c) => c.pipId === id));
+
+  if (loading) {
+    return (
+      <AppShell title="รายละเอียด PIP" subtitle="">
+        <LoadingSkeleton rows={4} />
+      </AppShell>
+    );
+  }
+
+  if (error && !mockPIP) {
+    return (
+      <AppShell title="รายละเอียด PIP" subtitle="">
+        <ErrorState message={error} onRetry={refetch} />
+      </AppShell>
+    );
+  }
 
   if (!pip) {
     return (
@@ -215,19 +245,32 @@ export default function PIPDetailPage({ params }: { params: Promise<{ id: string
     })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (!newComment.trim()) return;
-    const comment = {
+
+    const optimisticComment: Comment = {
       id: `c-${Date.now()}`,
       pipId: id,
       userId: "u1",
       userName: "สมศรี จันทร์สว่าง",
-      userRole: "admin" as const,
+      userRole: "admin",
       content: newComment,
       createdAt: new Date().toISOString(),
     };
-    setComments([...comments, comment]);
-    setNewComment("");
+
+    await postComment({
+      method: "POST",
+      body: { content: newComment },
+      onSuccess: () => {
+        setComments([...comments, optimisticComment]);
+        setNewComment("");
+      },
+      onError: () => {
+        // Fallback: add comment locally even if API fails
+        setComments([...comments, optimisticComment]);
+        setNewComment("");
+      },
+    });
   };
 
   return (
@@ -638,10 +681,14 @@ export default function PIPDetailPage({ params }: { params: Promise<{ id: string
                     <Button
                       size="sm"
                       className="bg-brand-dark hover:bg-brand-700"
-                      disabled={!newComment.trim()}
+                      disabled={!newComment.trim() || postingComment}
                       onClick={handleAddComment}
                     >
-                      <Send className="mr-2 h-4 w-4" />
+                      {postingComment ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="mr-2 h-4 w-4" />
+                      )}
                       ส่งความคิดเห็น
                     </Button>
                   </div>

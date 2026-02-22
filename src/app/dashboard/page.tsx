@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,11 @@ import {
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useApi } from "@/lib/hooks";
+import { LoadingSkeleton } from "@/components/ui/loading";
+import { ErrorState } from "@/components/ui/error-state";
 import { mockPIPs, mockDashboardStats, mockCheckIns } from "@/lib/mockup-data";
+import type { PIPRecord, CheckIn, DashboardStats } from "@/lib/types";
 import Link from "next/link";
 
 const statusConfig: Record<
@@ -111,8 +116,49 @@ function getDaysRemaining(endDate: string): number {
 }
 
 export default function DashboardPage() {
-  const activePIPs = mockPIPs.filter((p) => p.status === "active");
-  const recentCheckIns = mockCheckIns.slice(-3);
+  const { data: apiPIPs, loading, error, refetch } = useApi<PIPRecord[]>("/api/pip?status=active");
+
+  // Use API data if available, otherwise fall back to mockup
+  const allPIPs = apiPIPs && apiPIPs.length > 0 ? apiPIPs : mockPIPs;
+  const activePIPs = allPIPs.filter((p) => p.status === "active");
+
+  // Compute dashboard stats from fetched PIPs (or fallback)
+  const stats: DashboardStats = useMemo(() => {
+    if (!apiPIPs || apiPIPs.length === 0) return mockDashboardStats;
+    // When we get active PIPs from API, we compute stats from those
+    // For a full dashboard, we'd need all PIPs, but we use what we have
+    const totalActive = allPIPs.filter((p) => p.status === "active").length;
+    const totalCompleted = allPIPs.filter((p) => p.status === "completed").length;
+    const totalFailed = allPIPs.filter((p) => p.status === "failed").length;
+    const totalPending = allPIPs.filter((p) => p.status === "pending").length;
+    const nearDeadline = allPIPs.filter(
+      (p) => p.status === "active" && getDaysRemaining(p.endDate) <= 14
+    ).length;
+    const passRate =
+      totalCompleted + totalFailed > 0
+        ? Math.round((totalCompleted / (totalCompleted + totalFailed)) * 100)
+        : 0;
+    return { totalActive, totalCompleted, totalFailed, totalPending, nearDeadline, passRate };
+  }, [apiPIPs, allPIPs]);
+
+  // Use mockup check-ins as fallback (API would return them embedded in PIP or separately)
+  const recentCheckIns: CheckIn[] = mockCheckIns.slice(-3);
+
+  if (loading) {
+    return (
+      <AppShell title="แดชบอร์ด" subtitle="ภาพรวมแผนพัฒนาประสิทธิภาพ (PIP)">
+        <LoadingSkeleton rows={3} />
+      </AppShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppShell title="แดชบอร์ด" subtitle="ภาพรวมแผนพัฒนาประสิทธิภาพ (PIP)">
+        <ErrorState message={error} onRetry={refetch} />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title="แดชบอร์ด" subtitle="ภาพรวมแผนพัฒนาประสิทธิภาพ (PIP)">
@@ -120,38 +166,38 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard
           title="PIP ที่กำลังดำเนินการ"
-          value={mockDashboardStats.totalActive}
+          value={stats.totalActive}
           icon={Target}
           color="bg-brand-dark"
         />
         <StatCard
           title="สำเร็จ"
-          value={mockDashboardStats.totalCompleted}
+          value={stats.totalCompleted}
           icon={CheckCircle2}
           color="bg-brand-500"
         />
         <StatCard
           title="ไม่ผ่าน"
-          value={mockDashboardStats.totalFailed}
+          value={stats.totalFailed}
           icon={XCircle}
           color="bg-accent-brand-500"
         />
         <StatCard
           title="รอดำเนินการ"
-          value={mockDashboardStats.totalPending}
+          value={stats.totalPending}
           icon={Clock}
           color="bg-brown-500"
         />
         <StatCard
           title="ใกล้ครบกำหนด"
-          value={mockDashboardStats.nearDeadline}
+          value={stats.nearDeadline}
           icon={AlertTriangle}
           color="bg-accent-brand-400"
           subtitle="ภายใน 14 วัน"
         />
         <StatCard
           title="อัตราผ่าน"
-          value={`${mockDashboardStats.passRate}%`}
+          value={`${stats.passRate}%`}
           icon={TrendingUp}
           color="bg-brand-700"
         />
@@ -294,7 +340,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
               {recentCheckIns.map((ci) => {
-                const pip = mockPIPs.find((p) => p.id === ci.pipId);
+                const pip = allPIPs.find((p) => p.id === ci.pipId);
                 return (
                   <div
                     key={ci.id}
@@ -330,7 +376,7 @@ export default function DashboardPage() {
             <CardContent className="pt-0">
               <div className="space-y-2">
                 {Object.entries(statusConfig).map(([key, config]) => {
-                  const count = mockPIPs.filter(
+                  const count = allPIPs.filter(
                     (p) => p.status === key
                   ).length;
                   return (

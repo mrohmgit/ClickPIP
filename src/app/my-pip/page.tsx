@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,13 +30,16 @@ import {
   AlertTriangle,
   Star,
   FileText,
+  Loader2,
 } from "lucide-react";
+import { useApi, useApiMutation } from "@/lib/hooks";
+import { LoadingSkeleton } from "@/components/ui/loading";
+import { ErrorState } from "@/components/ui/error-state";
 import { mockPIPs, mockCheckIns, mockComments, mockUsers } from "@/lib/mockup-data";
-import type { GoalRating } from "@/lib/types";
+import type { PIPRecord, CheckIn, Comment, GoalRating } from "@/lib/types";
 
 // Simulate employee view — employee u3 (สมชาย)
-const employeeUser = mockUsers.find((u) => u.id === "u3")!;
-const employeePIPs = mockPIPs.filter((p) => p.employeeId === employeeUser.id);
+const fallbackEmployeeUser = mockUsers.find((u) => u.id === "u3")!;
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   active: { label: "กำลังดำเนินการ", className: "bg-brand-dark text-white hover:bg-brand-dark" },
@@ -76,15 +79,46 @@ function RatingStars({ rating }: { rating: GoalRating | null }) {
 }
 
 export default function MyPIPPage() {
-  const [selectedPIP, setSelectedPIP] = useState(
-    employeePIPs.find((p) => p.status === "active") || employeePIPs[0]
-  );
+  // Fetch current user's PIPs from API
+  const { data: apiPIPs, loading, error, refetch } = useApi<PIPRecord[]>("/api/pip?employeeId=current");
+
+  // Fallback to mockup
+  const fallbackPIPs = mockPIPs.filter((p) => p.employeeId === fallbackEmployeeUser.id);
+  const employeePIPs = apiPIPs && apiPIPs.length > 0 ? apiPIPs : fallbackPIPs;
+  const employeeUser = fallbackEmployeeUser;
+
+  const [selectedPIP, setSelectedPIP] = useState<PIPRecord | null>(null);
+
+  // Auto-select first active PIP once data is loaded
+  const currentPIP = selectedPIP || employeePIPs.find((p) => p.status === "active") || employeePIPs[0];
+
   const [newNote, setNewNote] = useState("");
-  const [notes, setNotes] = useState(
-    mockComments.filter((c) => c.pipId === selectedPIP?.id)
+  const [notes, setNotes] = useState<Comment[]>(
+    mockComments.filter((c) => c.pipId === (currentPIP?.id || ""))
   );
 
-  if (!selectedPIP) {
+  // Comment mutation
+  const { mutate: postNote, loading: postingNote } = useApiMutation(
+    currentPIP ? `/api/pip/${currentPIP.id}/comments` : "/api/pip/comments"
+  );
+
+  if (loading) {
+    return (
+      <AppShell title="PIP ของฉัน" subtitle="แผนพัฒนาประสิทธิภาพ">
+        <LoadingSkeleton rows={3} />
+      </AppShell>
+    );
+  }
+
+  if (error && fallbackPIPs.length === 0) {
+    return (
+      <AppShell title="PIP ของฉัน" subtitle="แผนพัฒนาประสิทธิภาพ">
+        <ErrorState message={error} onRetry={refetch} />
+      </AppShell>
+    );
+  }
+
+  if (!currentPIP) {
     return (
       <AppShell title="PIP ของฉัน" subtitle="แผนพัฒนาประสิทธิภาพ">
         <div className="flex min-h-[400px] flex-col items-center justify-center">
@@ -98,35 +132,46 @@ export default function MyPIPPage() {
     );
   }
 
-  const checkIns = mockCheckIns.filter((ci) => ci.pipId === selectedPIP.id);
-  const daysLeft = getDaysRemaining(selectedPIP.endDate);
-  const timeProgress = getTimeProgress(selectedPIP.startDate, selectedPIP.endDate);
-  const totalGoals = selectedPIP.goals.length;
+  const checkIns: CheckIn[] = mockCheckIns.filter((ci) => ci.pipId === currentPIP.id);
+  const daysLeft = getDaysRemaining(currentPIP.endDate);
+  const timeProgress = getTimeProgress(currentPIP.startDate, currentPIP.endDate);
+  const totalGoals = currentPIP.goals.length;
   const avgProgress =
     totalGoals > 0
       ? Math.round(
-          selectedPIP.goals.reduce(
+          currentPIP.goals.reduce(
             (sum, g) => sum + Math.min((g.currentValue / g.targetValue) * 100, 100),
             0
           ) / totalGoals
         )
       : 0;
 
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (!newNote.trim()) return;
-    setNotes([
-      ...notes,
-      {
-        id: `n-${Date.now()}`,
-        pipId: selectedPIP.id,
-        userId: employeeUser.id,
-        userName: employeeUser.name,
-        userRole: "employee",
-        content: newNote,
-        createdAt: new Date().toISOString(),
+
+    const optimisticNote: Comment = {
+      id: `n-${Date.now()}`,
+      pipId: currentPIP.id,
+      userId: employeeUser.id,
+      userName: employeeUser.name,
+      userRole: "employee",
+      content: newNote,
+      createdAt: new Date().toISOString(),
+    };
+
+    await postNote({
+      method: "POST",
+      body: { content: newNote },
+      onSuccess: () => {
+        setNotes([...notes, optimisticNote]);
+        setNewNote("");
       },
-    ]);
-    setNewNote("");
+      onError: () => {
+        // Fallback: add locally
+        setNotes([...notes, optimisticNote]);
+        setNewNote("");
+      },
+    });
   };
 
   return (
@@ -152,10 +197,10 @@ export default function MyPIPPage() {
                 {employeePIPs.map((pip) => (
                   <Button
                     key={pip.id}
-                    variant={selectedPIP.id === pip.id ? "default" : "outline"}
+                    variant={currentPIP.id === pip.id ? "default" : "outline"}
                     size="sm"
                     className={
-                      selectedPIP.id === pip.id
+                      currentPIP.id === pip.id
                         ? "bg-brand-dark hover:bg-brand-700"
                         : ""
                     }
@@ -188,8 +233,8 @@ export default function MyPIPPage() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">สถานะ</p>
-                <Badge className={`mt-0.5 ${statusConfig[selectedPIP.status].className}`}>
-                  {statusConfig[selectedPIP.status].label}
+                <Badge className={`mt-0.5 ${statusConfig[currentPIP.status].className}`}>
+                  {statusConfig[currentPIP.status].label}
                 </Badge>
               </div>
             </div>
@@ -205,10 +250,10 @@ export default function MyPIPPage() {
               <div>
                 <p className="text-xs text-muted-foreground">ระยะเวลา</p>
                 <p className="text-sm font-bold font-title">
-                  {selectedPIP.duration} วัน
+                  {currentPIP.duration} วัน
                 </p>
                 <p className="text-[10px] text-muted-foreground">
-                  {selectedPIP.startDate} — {selectedPIP.endDate}
+                  {currentPIP.startDate} — {currentPIP.endDate}
                 </p>
               </div>
             </div>
@@ -304,14 +349,14 @@ export default function MyPIPPage() {
                 <div>
                   <p className="text-sm font-medium">เหตุผลที่เปิด PIP</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {selectedPIP.reason}
+                    {currentPIP.reason}
                   </p>
                 </div>
               </CardContent>
             </Card>
 
             {/* Goals */}
-            {selectedPIP.goals.map((goal, index) => {
+            {currentPIP.goals.map((goal, index) => {
               const percent = Math.min(
                 Math.round((goal.currentValue / goal.targetValue) * 100),
                 100
@@ -374,7 +419,7 @@ export default function MyPIPPage() {
               );
             })}
 
-            {selectedPIP.goals.length === 0 && (
+            {currentPIP.goals.length === 0 && (
               <Card className="border-none shadow-sm">
                 <CardContent className="flex flex-col items-center py-12">
                   <FileText className="h-10 w-10 text-muted-foreground" />
@@ -441,7 +486,7 @@ export default function MyPIPPage() {
                             </TableHeader>
                             <TableBody>
                               {ci.goalUpdates.map((gu) => {
-                                const goal = selectedPIP.goals.find(
+                                const goal = currentPIP.goals.find(
                                   (g) => g.id === gu.goalId
                                 );
                                 const change = gu.currentValue - gu.previousValue;
@@ -557,10 +602,14 @@ export default function MyPIPPage() {
                     <Button
                       size="sm"
                       className="bg-brand-dark hover:bg-brand-700"
-                      disabled={!newNote.trim()}
+                      disabled={!newNote.trim() || postingNote}
                       onClick={handleAddNote}
                     >
-                      <Send className="mr-2 h-4 w-4" />
+                      {postingNote ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="mr-2 h-4 w-4" />
+                      )}
                       ส่งข้อความ
                     </Button>
                   </div>

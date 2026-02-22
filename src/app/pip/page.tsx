@@ -31,8 +31,11 @@ import {
   Filter,
   Download,
 } from "lucide-react";
+import { useApi } from "@/lib/hooks";
+import { LoadingSkeleton } from "@/components/ui/loading";
+import { ErrorState } from "@/components/ui/error-state";
 import { mockPIPs, mockDepartments } from "@/lib/mockup-data";
-import type { PIPStatus } from "@/lib/types";
+import type { PIPRecord, Department } from "@/lib/types";
 
 const statusConfig: Record<
   string,
@@ -99,8 +102,16 @@ export default function PIPListPage() {
   const [durationFilter, setDurationFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const { data: apiPIPs, loading, error, refetch } = useApi<PIPRecord[]>("/api/pip");
+
+  // Fallback to mockup data
+  const pips = apiPIPs && apiPIPs.length > 0 ? apiPIPs : mockPIPs;
+
+  // Departments fallback
+  const departments: Department[] = mockDepartments;
+
   const filteredPIPs = useMemo(() => {
-    return mockPIPs.filter((pip) => {
+    return pips.filter((pip) => {
       if (statusFilter !== "all" && pip.status !== statusFilter) return false;
       if (
         departmentFilter !== "all" &&
@@ -121,15 +132,31 @@ export default function PIPListPage() {
         return false;
       return true;
     });
-  }, [statusFilter, departmentFilter, durationFilter, searchQuery]);
+  }, [pips, statusFilter, departmentFilter, durationFilter, searchQuery]);
 
   const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: mockPIPs.length };
-    mockPIPs.forEach((pip) => {
+    const counts: Record<string, number> = { all: pips.length };
+    pips.forEach((pip) => {
       counts[pip.status] = (counts[pip.status] || 0) + 1;
     });
     return counts;
-  }, []);
+  }, [pips]);
+
+  if (loading) {
+    return (
+      <AppShell title="รายการ PIP" subtitle="จัดการแผนพัฒนาประสิทธิภาพทั้งหมด">
+        <LoadingSkeleton rows={5} />
+      </AppShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppShell title="รายการ PIP" subtitle="จัดการแผนพัฒนาประสิทธิภาพทั้งหมด">
+        <ErrorState message={error} onRetry={refetch} />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title="รายการ PIP" subtitle="จัดการแผนพัฒนาประสิทธิภาพทั้งหมด">
@@ -177,7 +204,7 @@ export default function PIPListPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">ทุกแผนก</SelectItem>
-              {mockDepartments.map((dept) => (
+              {departments.map((dept) => (
                 <SelectItem key={dept.id} value={dept.name}>
                   {dept.name}
                 </SelectItem>

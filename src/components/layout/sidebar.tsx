@@ -5,15 +5,26 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
-  PlusCircle,
   Users,
   BarChart3,
   Settings,
   LogOut,
   ChevronLeft,
-  Bell,
   Target,
   UserCircle,
+  Clock,
+  CalendarDays,
+  ClipboardList,
+  Award,
+  Building2,
+  Bot,
+  Bell,
+  BriefcaseBusiness,
+  Brain,
+  ShieldAlert,
+  BookOpen,
+  Lightbulb,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -23,42 +34,81 @@ import { Separator } from "@/components/ui/separator";
 import { currentUser } from "@/lib/mockup-data";
 import { useState } from "react";
 
-const menuItems = [
+interface MenuSection {
+  title: string;
+  items: MenuItem[];
+}
+
+interface MenuItem {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  badge?: number;
+}
+
+const menuSections: MenuSection[] = [
   {
-    label: "แดชบอร์ด",
-    href: "/dashboard",
-    icon: LayoutDashboard,
+    title: "หลัก",
+    items: [
+      { label: "แดชบอร์ด", href: "/dashboard", icon: LayoutDashboard },
+      { label: "การแจ้งเตือน", href: "/notifications", icon: Bell, badge: 5 },
+    ],
   },
   {
-    label: "รายการ PIP",
-    href: "/pip",
-    icon: FileText,
-    badge: 2,
+    title: "PIP",
+    items: [
+      { label: "รายการ PIP", href: "/pip", icon: FileText, badge: 2 },
+      { label: "PIP ของฉัน", href: "/my-pip", icon: UserCircle },
+    ],
   },
   {
-    label: "สร้าง PIP ใหม่",
-    href: "/pip/create",
-    icon: PlusCircle,
+    title: "เวลาทำงาน",
+    items: [
+      { label: "ภาพรวมการเข้างาน", href: "/attendance", icon: Clock },
+      { label: "บันทึกรายวัน", href: "/attendance/daily", icon: CalendarDays },
+      { label: "การเข้างานของฉัน", href: "/attendance/my", icon: UserCircle },
+      { label: "ขอทำล่วงเวลา", href: "/attendance/overtime", icon: BriefcaseBusiness },
+      { label: "ขอลางาน", href: "/attendance/leave", icon: CalendarDays },
+    ],
   },
   {
-    label: "PIP ของฉัน",
-    href: "/my-pip",
-    icon: UserCircle,
+    title: "งานที่มอบหมาย",
+    items: [
+      { label: "บอร์ดงาน", href: "/tasks", icon: ClipboardList },
+      { label: "งานของฉัน", href: "/tasks/my", icon: UserCircle },
+    ],
   },
   {
-    label: "รายชื่อพนักงาน",
-    href: "/employees",
-    icon: Users,
+    title: "การประเมิน",
+    items: [
+      { label: "รอบการประเมิน", href: "/assessments", icon: Award },
+      { label: "ประเมินตนเอง", href: "/assessments/my", icon: UserCircle },
+      { label: "แผนค่าตอบแทน", href: "/assessments/compensation", icon: DollarSign },
+    ],
   },
   {
-    label: "รายงาน",
-    href: "/reports",
-    icon: BarChart3,
+    title: "แผนก & KPI",
+    items: [
+      { label: "รายชื่อแผนก", href: "/departments", icon: Building2 },
+    ],
   },
   {
-    label: "ตั้งค่า",
-    href: "/settings",
-    icon: Settings,
+    title: "AI-HR Manager",
+    items: [
+      { label: "แชท AI", href: "/ai-hr", icon: Bot },
+      { label: "ข้อมูลเชิงลึก", href: "/ai-hr/insights", icon: Lightbulb },
+      { label: "การแจ้งเตือน AI", href: "/ai-hr/alerts", icon: ShieldAlert },
+      { label: "กฎการเฝ้าระวัง", href: "/ai-hr/guardrails", icon: Brain },
+      { label: "ฐานความรู้", href: "/ai-hr/knowledge", icon: BookOpen },
+    ],
+  },
+  {
+    title: "ระบบ",
+    items: [
+      { label: "รายชื่อพนักงาน", href: "/employees", icon: Users },
+      { label: "รายงาน", href: "/reports", icon: BarChart3 },
+      { label: "ตั้งค่า", href: "/settings", icon: Settings },
+    ],
   },
 ];
 
@@ -146,38 +196,52 @@ export function Sidebar() {
       <Separator className="bg-white/15" />
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3">
-        {menuItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname?.startsWith(item.href));
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
-                isActive
-                  ? "bg-white/15 text-white font-medium"
-                  : "text-white/70 hover:bg-white/10 hover:text-white",
-                collapsed && "justify-center px-2"
-              )}
-              title={collapsed ? item.label : undefined}
-            >
-              <item.icon className="h-5 w-5 shrink-0" />
-              {!collapsed && (
-                <>
-                  <span className="flex-1">{item.label}</span>
-                  {item.badge && (
-                    <Badge className="h-5 min-w-5 justify-center bg-accent-brand-500 text-[10px] text-white hover:bg-accent-brand-600">
-                      {item.badge}
-                    </Badge>
-                  )}
-                </>
-              )}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 overflow-y-auto px-3 py-2">
+        {menuSections.map((section) => (
+          <div key={section.title} className="mb-2">
+            {!collapsed && (
+              <p className="mb-1 px-3 pt-2 text-[10px] font-medium uppercase tracking-wider text-white/40">
+                {section.title}
+              </p>
+            )}
+            {collapsed && <Separator className="my-1 bg-white/10" />}
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== "/dashboard" &&
+                    item.href !== "/notifications" &&
+                    pathname?.startsWith(item.href));
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                      isActive
+                        ? "bg-white/15 text-white font-medium"
+                        : "text-white/70 hover:bg-white/10 hover:text-white",
+                      collapsed && "justify-center px-2"
+                    )}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <item.icon className="h-4.5 w-4.5 shrink-0" />
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1 text-[13px]">{item.label}</span>
+                        {item.badge && (
+                          <Badge className="h-5 min-w-5 justify-center bg-accent-brand-500 text-[10px] text-white hover:bg-accent-brand-600">
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Bottom */}

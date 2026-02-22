@@ -31,8 +31,11 @@ import {
   Filter,
   Mail,
 } from "lucide-react";
+import { useApi } from "@/lib/hooks";
+import { LoadingSkeleton } from "@/components/ui/loading";
+import { ErrorState } from "@/components/ui/error-state";
 import { mockUsers, mockDepartments, mockPIPs } from "@/lib/mockup-data";
-import type { UserRole } from "@/lib/types";
+import type { User, PIPRecord, Department, UserRole } from "@/lib/types";
 
 const roleConfig: Record<UserRole, { label: string; className: string }> = {
   super_admin: { label: "Super Admin", className: "bg-brand-700 text-white hover:bg-brand-700" },
@@ -46,8 +49,18 @@ export default function EmployeesPage() {
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
 
+  // Fetch users from API
+  const { data: apiUsers, loading, error, refetch } = useApi<User[]>("/api/users");
+
+  // Fallback to mockup
+  const users = apiUsers && apiUsers.length > 0 ? apiUsers : mockUsers;
+  const departments: Department[] = mockDepartments;
+
+  // Use mockPIPs as fallback for PIP counts (API users might not include this)
+  const pips: PIPRecord[] = mockPIPs;
+
   const filteredUsers = useMemo(() => {
-    return mockUsers.filter((user) => {
+    return users.filter((user) => {
       if (
         searchQuery &&
         !user.name.includes(searchQuery) &&
@@ -61,15 +74,31 @@ export default function EmployeesPage() {
         return false;
       return true;
     });
-  }, [searchQuery, departmentFilter, roleFilter]);
+  }, [users, searchQuery, departmentFilter, roleFilter]);
 
   const roleCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    mockUsers.forEach((u) => {
+    users.forEach((u) => {
       counts[u.role] = (counts[u.role] || 0) + 1;
     });
     return counts;
-  }, []);
+  }, [users]);
+
+  if (loading) {
+    return (
+      <AppShell title="รายชื่อพนักงาน" subtitle="จัดการข้อมูลพนักงานทั้งหมด">
+        <LoadingSkeleton rows={5} />
+      </AppShell>
+    );
+  }
+
+  if (error && mockUsers.length === 0) {
+    return (
+      <AppShell title="รายชื่อพนักงาน" subtitle="จัดการข้อมูลพนักงานทั้งหมด">
+        <ErrorState message={error} onRetry={refetch} />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title="รายชื่อพนักงาน" subtitle="จัดการข้อมูลพนักงานทั้งหมด">
@@ -82,7 +111,7 @@ export default function EmployeesPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">พนักงานทั้งหมด</p>
-              <p className="text-2xl font-bold font-title">{mockUsers.length}</p>
+              <p className="text-2xl font-bold font-title">{users.length}</p>
             </div>
           </CardContent>
         </Card>
@@ -117,7 +146,7 @@ export default function EmployeesPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">ทุกแผนก</SelectItem>
-              {mockDepartments.map((dept) => (
+              {departments.map((dept) => (
                 <SelectItem key={dept.id} value={dept.name}>
                   {dept.name}
                 </SelectItem>
@@ -172,13 +201,13 @@ export default function EmployeesPage() {
                     .split(" ")
                     .map((n) => n[0])
                     .join("");
-                  const userPIPs = mockPIPs.filter(
+                  const userPIPs = pips.filter(
                     (p) => p.employeeId === user.id
                   );
                   const activePIPs = userPIPs.filter(
                     (p) => p.status === "active"
                   );
-                  const manager = mockUsers.find(
+                  const manager = users.find(
                     (u) => u.id === user.managerId
                   );
 

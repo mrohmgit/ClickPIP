@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Mitr, Sarabun } from "next/font/google";
 import "./globals.css";
+import { SessionProvider } from "next-auth/react";
 
 const mitr = Mitr({
   variable: "--font-mitr",
@@ -17,8 +18,8 @@ const sarabun = Sarabun({
 });
 
 export const metadata: Metadata = {
-  title: "ClickPIP — ระบบจัดการแผนพัฒนาประสิทธิภาพ",
-  description: "ระบบจัดการแผนพัฒนาประสิทธิภาพการทำงาน (PIP) สำหรับติดตามและพัฒนาพนักงาน",
+  title: "ClickPIP — ระบบจัดการประสิทธิภาพการทำงาน",
+  description: "ระบบจัดการประสิทธิภาพการทำงานครบวงจร ครอบคลุม PIP, เวลาทำงาน, งานที่มอบหมาย, การประเมินผล, และ AI-HR Manager",
 };
 
 export default function RootLayout({
@@ -29,7 +30,7 @@ export default function RootLayout({
   return (
     <html lang="th">
       <body className={`${mitr.variable} ${sarabun.variable} antialiased`}>
-        {children}
+        <SessionProvider>{children}</SessionProvider>
       </body>
     </html>
   );
